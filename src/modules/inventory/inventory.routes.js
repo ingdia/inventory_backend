@@ -1,6 +1,6 @@
 const express = require('express');
 const { protect } = require('../../middleware/auth.middleware');
-const { validate } = require('../../validators/auth.validator');
+const validate = require('../../middleware/validate.middleware');
 const { stockMovementRules } = require('./inventory.validation');
 const c = require('./inventory.controller');
 
