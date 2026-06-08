@@ -6,6 +6,8 @@ const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const medicineRoutes = require('./modules/medicines/medicine.routes');
+const inventoryRoutes = require('./modules/inventory/inventory.routes');
 const errorHandler = require('./middleware/error.middleware');
 const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
 
@@ -39,6 +41,8 @@ app.use('/api', apiLimiter);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/medicines', medicineRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ success: true, message: 'Pharmacy API is running.' }));
