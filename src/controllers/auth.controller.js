@@ -1,0 +1,139 @@
+const User = require('../models/User');
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  REFRESH_COOKIE_OPTIONS,
+} = require('../utils/jwt');
+const { sendSuccess, sendError } = require('../utils/response');
+
+// POST /api/auth/register
+const register = async (req, res, next) => {
+  try {
+    const { firstName, lastName, email, password, role, phone } = req.body;
+
+    // Only owners can create other owners
+    if (role === 'owner') {
+      const ownerExists = await User.findOne({ role: 'owner' });
+      if (ownerExists) {
+        // If request comes from a non-owner user attempting to create another owner
+        if (!req.user || req.user.role !== 'owner') {
+          return sendError(res, 403, 'Only the system owner can create another owner account.');
+        }
+      }
+    }
+
+    const user = await User.create({ firstName, lastName, email, password, role, phone });
+
+    return sendSuccess(res, 201, 'Account created successfully.', { user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/login
+const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email }).select('+password +refreshToken');
+    if (!user || !(await user.comparePassword(password))) {
+      return sendError(res, 401, 'Invalid email or password.');
+    }
+
+    if (!user.isActive) {
+      return sendError(res, 403, 'Your account has been deactivated. Contact the owner.');
+    }
+
+    const accessToken = signAccessToken(user._id, user.role);
+    const refreshToken = signRefreshToken(user._id);
+
+    user.refreshToken = refreshToken;
+    user.lastLogin = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+
+    return sendSuccess(res, 200, 'Login successful.', {
+      accessToken,
+      user,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/refresh
+const refreshToken = async (req, res, next) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (!token) return sendError(res, 401, 'No refresh token provided.');
+
+    const decoded = verifyRefreshToken(token);
+    const user = await User.findById(decoded.id).select('+refreshToken');
+
+    if (!user || user.refreshToken !== token) {
+      return sendError(res, 401, 'Invalid refresh token. Please log in again.');
+    }
+
+    const newAccessToken = signAccessToken(user._id, user.role);
+    const newRefreshToken = signRefreshToken(user._id);
+
+    user.refreshToken = newRefreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    res.cookie('refreshToken', newRefreshToken, REFRESH_COOKIE_OPTIONS);
+
+    return sendSuccess(res, 200, 'Token refreshed.', { accessToken: newAccessToken });
+  } catch (err) {
+    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return sendError(res, 401, 'Invalid or expired refresh token. Please log in again.');
+    }
+    next(err);
+  }
+};
+
+// POST /api/auth/logout
+const logout = async (req, res, next) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (token) {
+      const user = await User.findOne({ refreshToken: token }).select('+refreshToken');
+      if (user) {
+        user.refreshToken = null;
+        await user.save({ validateBeforeSave: false });
+      }
+    }
+    res.clearCookie('refreshToken');
+    return sendSuccess(res, 200, 'Logged out successfully.');
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/auth/me
+const getMe = async (req, res) => {
+  return sendSuccess(res, 200, 'Profile retrieved.', { user: req.user });
+};
+
+// PATCH /api/auth/update-password
+const updatePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id).select('+password');
+
+    if (!(await user.comparePassword(currentPassword))) {
+      return sendError(res, 401, 'Current password is incorrect.');
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    const accessToken = signAccessToken(user._id, user.role);
+    return sendSuccess(res, 200, 'Password updated successfully.', { accessToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, refreshToken, logout, getMe, updatePassword };
