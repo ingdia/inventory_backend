@@ -65,7 +65,7 @@ const userSchema = new mongoose.Schema(
       select: false,
       default: null,
     },
-    passwordResetExpiresAt: {
+    passwordResetExpires: {
       type: Date,
       select: false,
       default: null,
