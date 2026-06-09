@@ -38,9 +38,12 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email }).select('+password +refreshToken');
-    if (!user || !(await user.comparePassword(password))) {
-      return sendError(res, 401, 'Invalid email or password.');
-    }
+
+    // Return early before bcrypt if user not found — prevents unnecessary hash computation
+    if (!user) return sendError(res, 401, 'Invalid email or password.');
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) return sendError(res, 401, 'Invalid email or password.');
 
     if (!user.isActive) {
       return sendError(res, 403, 'Your account has been deactivated. Contact the owner.');
@@ -49,16 +52,19 @@ const login = async (req, res, next) => {
     const accessToken = signAccessToken(user._id, user.role);
     const refreshToken = signRefreshToken(user._id);
 
-    user.refreshToken = refreshToken;
-    user.lastLogin = new Date();
-    await user.save({ validateBeforeSave: false });
+    // Use updateOne to avoid triggering pre-save hook (faster — no bcrypt re-hash)
+    await User.updateOne(
+      { _id: user._id },
+      { refreshToken, lastLogin: new Date() }
+    );
 
     res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
 
-    return sendSuccess(res, 200, 'Login successful.', {
-      accessToken,
-      user,
-    });
+    // Strip sensitive fields before sending
+    user.password = undefined;
+    user.refreshToken = undefined;
+
+    return sendSuccess(res, 200, 'Login successful.', { accessToken, user });
   } catch (err) {
     next(err);
   }
