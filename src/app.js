@@ -3,11 +3,15 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const medicineRoutes = require('./modules/medicines/medicine.routes');
 const inventoryRoutes = require('./modules/inventory/inventory.routes');
+const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
+const reportsRoutes = require('./modules/reports/reports.routes');
 const errorHandler = require('./middleware/error.middleware');
 const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
 
@@ -34,6 +38,13 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// Swagger docs
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'PharmaManager API Docs',
+  customCss: '.swagger-ui .topbar { background-color: #06b6d4; }',
+}));
+app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+
 // Rate limiting
 app.use('/api/auth', authLimiter);
 app.use('/api', apiLimiter);
@@ -43,6 +54,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/medicines', medicineRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ success: true, message: 'Pharmacy API is running.' }));
