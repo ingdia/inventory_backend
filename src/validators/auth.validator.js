@@ -44,10 +44,19 @@ const updateProfileRules = [
   body('phone').optional().trim(),
 ];
 
+const resetPasswordRules = [
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain uppercase, lowercase and a number'),
+];
+
 module.exports = {
   validate,
   loginRules,
   registerRules,
   updatePasswordRules,
   updateProfileRules,
+  resetPasswordRules,
 };

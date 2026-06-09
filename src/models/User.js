@@ -60,16 +60,26 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    passwordResetToken: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
 // Hash password before saving
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+userSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
+  const cost = process.env.NODE_ENV === 'production' ? 12 : 10;
+  this.password = await bcrypt.hash(this.password, cost);
   if (!this.isNew) this.passwordChangedAt = Date.now();
-  next();
 });
 
 // Instance method: compare password

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const crypto = require('crypto');
 const {
   signAccessToken,
   signRefreshToken,
@@ -37,9 +38,12 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email }).select('+password +refreshToken');
-    if (!user || !(await user.comparePassword(password))) {
-      return sendError(res, 401, 'Invalid email or password.');
-    }
+
+    // Return early before bcrypt if user not found — prevents unnecessary hash computation
+    if (!user) return sendError(res, 401, 'Invalid email or password.');
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) return sendError(res, 401, 'Invalid email or password.');
 
     if (!user.isActive) {
       return sendError(res, 403, 'Your account has been deactivated. Contact the owner.');
@@ -48,16 +52,19 @@ const login = async (req, res, next) => {
     const accessToken = signAccessToken(user._id, user.role);
     const refreshToken = signRefreshToken(user._id);
 
-    user.refreshToken = refreshToken;
-    user.lastLogin = new Date();
-    await user.save({ validateBeforeSave: false });
+    // Use updateOne to avoid triggering pre-save hook (faster — no bcrypt re-hash)
+    await User.updateOne(
+      { _id: user._id },
+      { refreshToken, lastLogin: new Date() }
+    );
 
     res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
 
-    return sendSuccess(res, 200, 'Login successful.', {
-      accessToken,
-      user,
-    });
+    // Strip sensitive fields before sending
+    user.password = undefined;
+    user.refreshToken = undefined;
+
+    return sendSuccess(res, 200, 'Login successful.', { accessToken, user });
   } catch (err) {
     next(err);
   }
@@ -79,8 +86,8 @@ const refreshToken = async (req, res, next) => {
     const newAccessToken = signAccessToken(user._id, user.role);
     const newRefreshToken = signRefreshToken(user._id);
 
-    user.refreshToken = newRefreshToken;
-    await user.save({ validateBeforeSave: false });
+    // Use updateOne to skip pre-save hook
+    await User.updateOne({ _id: user._id }, { refreshToken: newRefreshToken });
 
     res.cookie('refreshToken', newRefreshToken, REFRESH_COOKIE_OPTIONS);
 
@@ -136,4 +143,55 @@ const updatePassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refreshToken, logout, getMe, updatePassword };
+// POST /api/auth/forgot-password
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    // Always respond 200 to prevent email enumeration
+    if (!user) {
+      return sendSuccess(res, 200, 'If that email exists, a reset link has been sent.');
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.passwordResetExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save({ validateBeforeSave: false });
+
+    // In production send via email — for now return token in dev mode
+    if (process.env.NODE_ENV === 'development') {
+      return sendSuccess(res, 200, 'Reset token generated (dev only).', { resetToken });
+    }
+
+    return sendSuccess(res, 200, 'If that email exists, a reset link has been sent.');
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /api/auth/reset-password/:token
+const resetPassword = async (req, res, next) => {
+  try {
+    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() },
+    }).select('+passwordResetToken +passwordResetExpires');
+
+    if (!user) return sendError(res, 400, 'Reset token is invalid or has expired.');
+
+    user.password = req.body.password;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    await user.save();
+
+    const accessToken = signAccessToken(user._id, user.role);
+    return sendSuccess(res, 200, 'Password reset successful.', { accessToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, refreshToken, logout, getMe, updatePassword, forgotPassword, resetPassword };
