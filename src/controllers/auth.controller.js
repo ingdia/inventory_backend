@@ -86,8 +86,8 @@ const refreshToken = async (req, res, next) => {
     const newAccessToken = signAccessToken(user._id, user.role);
     const newRefreshToken = signRefreshToken(user._id);
 
-    user.refreshToken = newRefreshToken;
-    await user.save({ validateBeforeSave: false });
+    // Use updateOne to skip pre-save hook
+    await User.updateOne({ _id: user._id }, { refreshToken: newRefreshToken });
 
     res.cookie('refreshToken', newRefreshToken, REFRESH_COOKIE_OPTIONS);
 
