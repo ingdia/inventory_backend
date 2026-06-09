@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const crypto = require('crypto');
 const {
   signAccessToken,
   signRefreshToken,
@@ -136,4 +137,55 @@ const updatePassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refreshToken, logout, getMe, updatePassword };
+// POST /api/auth/forgot-password
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    // Always respond 200 to prevent email enumeration
+    if (!user) {
+      return sendSuccess(res, 200, 'If that email exists, a reset link has been sent.');
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.passwordResetExpiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save({ validateBeforeSave: false });
+
+    // In production send via email — for now return token in dev mode
+    if (process.env.NODE_ENV === 'development') {
+      return sendSuccess(res, 200, 'Reset token generated (dev only).', { resetToken });
+    }
+
+    return sendSuccess(res, 200, 'If that email exists, a reset link has been sent.');
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /api/auth/reset-password/:token
+const resetPassword = async (req, res, next) => {
+  try {
+    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpiresAt: { $gt: Date.now() },
+    }).select('+passwordResetToken +passwordResetExpiresAt');
+
+    if (!user) return sendError(res, 400, 'Reset token is invalid or has expired.');
+
+    user.password = req.body.password;
+    user.passwordResetToken = null;
+    user.passwordResetExpiresAt = null;
+    await user.save();
+
+    const accessToken = signAccessToken(user._id, user.role);
+    return sendSuccess(res, 200, 'Password reset successful.', { accessToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, refreshToken, logout, getMe, updatePassword, forgotPassword, resetPassword };
