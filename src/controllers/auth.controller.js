@@ -156,7 +156,7 @@ const forgotPassword = async (req, res, next) => {
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.passwordResetExpiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+    user.passwordResetExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save({ validateBeforeSave: false });
 
     // In production send via email — for now return token in dev mode
@@ -177,14 +177,14 @@ const resetPassword = async (req, res, next) => {
 
     const user = await User.findOne({
       passwordResetToken: hashedToken,
-      passwordResetExpiresAt: { $gt: Date.now() },
-    }).select('+passwordResetToken +passwordResetExpiresAt');
+      passwordResetExpires: { $gt: Date.now() },
+    }).select('+passwordResetToken +passwordResetExpires');
 
     if (!user) return sendError(res, 400, 'Reset token is invalid or has expired.');
 
     user.password = req.body.password;
     user.passwordResetToken = null;
-    user.passwordResetExpiresAt = null;
+    user.passwordResetExpires = null;
     await user.save();
 
     const accessToken = signAccessToken(user._id, user.role);
