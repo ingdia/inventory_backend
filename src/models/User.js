@@ -77,7 +77,8 @@ const userSchema = new mongoose.Schema(
 // Hash password before saving
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
-  this.password = await bcrypt.hash(this.password, 12);
+  const cost = process.env.NODE_ENV === 'production' ? 12 : 10;
+  this.password = await bcrypt.hash(this.password, cost);
   if (!this.isNew) this.passwordChangedAt = Date.now();
 });
 
