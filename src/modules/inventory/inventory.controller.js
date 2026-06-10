@@ -2,6 +2,7 @@ const Inventory = require('./inventory.model');
 const InventoryTransaction = require('./inventoryTransaction.model');
 const Medicine = require('../medicines/medicine.model');
 const { sendSuccess, sendError } = require('../../utils/response');
+const { recordStockMovement } = require('./inventory.service');
 
 const MEDICINE_POPULATE = { path: 'medicine', select: 'name genericName unit reorderLevel purchasePrice sellingPrice expiryDate' };
 
@@ -58,6 +59,9 @@ exports.recordStockMovement = async (req, res) => {
     inventory.lastUpdatedBy = req.user._id;
     if (type === 'stock_in') inventory.lastRestockedAt = new Date();
     await inventory.save();
+
+    // Keep medicine.stock in sync with inventory quantity
+    await Medicine.findByIdAndUpdate(medicineId, { stock: newQuantity });
 
     const transaction = await InventoryTransaction.create({
       medicine: medicineId,
@@ -128,13 +132,10 @@ exports.getSummary = async (req, res) => {
     const now = new Date();
     const in30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    const [totalMedicines, inventories, medicines] = await Promise.all([
+    const [totalMedicines, medicines] = await Promise.all([
       Medicine.countDocuments({ status: 'active' }),
-      Inventory.find().lean(),
-      Medicine.find({ status: 'active' }).select('purchasePrice reorderLevel expiryDate').lean(),
+      Medicine.find({ status: 'active' }).select('purchasePrice reorderLevel expiryDate stock').lean(),
     ]);
-
-    const invMap = Object.fromEntries(inventories.map((i) => [i.medicine.toString(), i.quantity]));
 
     let totalStockValue = 0;
     let lowStockCount = 0;
@@ -143,7 +144,7 @@ exports.getSummary = async (req, res) => {
     let outOfStockCount = 0;
 
     for (const m of medicines) {
-      const qty = invMap[m._id.toString()] ?? 0;
+      const qty = m.stock ?? 0;
       totalStockValue += qty * m.purchasePrice;
       if (qty === 0) outOfStockCount++;
       if (qty <= m.reorderLevel) lowStockCount++;

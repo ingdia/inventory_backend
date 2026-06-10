@@ -8,6 +8,9 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const medicineRoutes = require('./modules/medicines/medicine.routes');
 const inventoryRoutes = require('./modules/inventory/inventory.routes');
+const supplierRoutes = require('./modules/suppliers/supplier.routes');
+const saleRoutes = require('./modules/sales/sale.routes');
+const purchaseRoutes = require('./modules/purchases/purchase.routes');
 const errorHandler = require('./middleware/error.middleware');
 const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
 
@@ -43,6 +46,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/medicines', medicineRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/sales', saleRoutes);
+app.use('/api/purchases', purchaseRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ success: true, message: 'Pharmacy API is running.' }));
