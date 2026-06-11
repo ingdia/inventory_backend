@@ -75,47 +75,7 @@ router.use(restrictTo('owner'));
  *               lastName:  { type: string, example: Smith }
  *               email:     { type: string, example: jane@pharmacy.com }
  *               password:  { type: string, example: Password123! }
- *               role:      { type: string, enum: [owner, pharmacist, cashier] }
- *     responses:
- *       201:
- *         description: User created
- */
-router.get('/', getAllUsers);
-router.post('/', registerRules, validate, createUser);
-
-/**
- * @swagger
- * /users/{id}:
- *   get:
- *     summary: Get user by ID
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
- *     responses:
- *       200:
- *         description: User data
- *       404:
- *         description: User not found
- *   patch:
- *     summary: Update user by ID
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               firstName: { type: string }
- *               lastName:  { type: string }
- *               role:      { type: string, enum: [owner, pharmacist, cashier] }
+ *               role:      { type: string, enum: [owner, pharmacist] }
  *     responses:
  *       200:
  *         description: User updated
