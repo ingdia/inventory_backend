@@ -10,11 +10,12 @@ const authLimiter = rateLimit({
 });
 
 const apiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 100,
+  windowMs: 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 300 : 5000,
   message: { success: false, message: 'Too many requests, please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
 });
 
 module.exports = { authLimiter, apiLimiter };
