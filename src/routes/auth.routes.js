@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  register,
   login,
   refreshToken,
   logout,
@@ -13,13 +12,11 @@ const {
 const { protect } = require('../middleware/auth.middleware');
 const {
   loginRules,
-  registerRules,
   updatePasswordRules,
   resetPasswordRules,
   validate,
 } = require('../validators/auth.validator');
 
-router.post('/register', registerRules, validate, register);
 router.post('/login', loginRules, validate, login);
 router.post('/refresh', refreshToken);
 router.post('/logout', logout);
