@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  register,
   login,
   refreshToken,
   logout,
@@ -13,7 +12,6 @@ const {
 const { protect } = require('../middleware/auth.middleware');
 const {
   loginRules,
-  registerRules,
   updatePasswordRules,
   resetPasswordRules,
   validate,
@@ -25,34 +23,6 @@ const {
  *   name: Auth
  *   description: Authentication endpoints
  */
-
-/**
- * @swagger
- * /auth/register:
- *   post:
- *     summary: Register a new user
- *     tags: [Auth]
- *     security: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [firstName, lastName, email, password, role]
- *             properties:
- *               firstName: { type: string, example: John }
- *               lastName:  { type: string, example: Doe }
- *               email:     { type: string, example: john@pharmacy.com }
- *               password:  { type: string, example: Password123! }
- *               role:      { type: string, enum: [owner, pharmacist, cashier] }
- *     responses:
- *       201:
- *         description: User registered successfully
- *       400:
- *         description: Validation error
- */
-router.post('/register', registerRules, validate, register);
 
 /**
  * @swagger
