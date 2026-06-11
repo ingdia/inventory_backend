@@ -8,30 +8,6 @@ const {
 } = require('../utils/jwt');
 const { sendSuccess, sendError } = require('../utils/response');
 
-// POST /api/auth/register
-const register = async (req, res, next) => {
-  try {
-    const { firstName, lastName, email, password, role, phone } = req.body;
-
-    // Only owners can create other owners
-    if (role === 'owner') {
-      const ownerExists = await User.findOne({ role: 'owner' });
-      if (ownerExists) {
-        // If request comes from a non-owner user attempting to create another owner
-        if (!req.user || req.user.role !== 'owner') {
-          return sendError(res, 403, 'Only the system owner can create another owner account.');
-        }
-      }
-    }
-
-    const user = await User.create({ firstName, lastName, email, password, role, phone });
-
-    return sendSuccess(res, 201, 'Account created successfully.', { user });
-  } catch (err) {
-    next(err);
-  }
-};
-
 // POST /api/auth/login
 const login = async (req, res, next) => {
   try {
@@ -194,4 +170,4 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refreshToken, logout, getMe, updatePassword, forgotPassword, resetPassword };
+module.exports = { login, refreshToken, logout, getMe, updatePassword, forgotPassword, resetPassword };
