@@ -47,6 +47,8 @@ const getUserById = async (req, res, next) => {
 const createUser = async (req, res, next) => {
   try {
     const { firstName, lastName, email, password, role, phone } = req.body;
+    const exists = await User.findOne({ email });
+    if (exists) return sendError(res, 409, 'Email already in use.');
     const user = await User.create({ firstName, lastName, email, password, role, phone });
     return sendSuccess(res, 201, 'User created successfully.', { user });
   } catch (err) {

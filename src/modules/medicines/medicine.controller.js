@@ -89,10 +89,7 @@ exports.deleteMedicine = async (req, res) => {
 exports.getLowStock = async (req, res) => {
   try {
     const medicines = await Medicine.find({ status: 'active' }).populate(POPULATE).lean();
-    const inventories = await Inventory.find().lean();
-    const invMap = Object.fromEntries(inventories.map((i) => [i.medicine.toString(), i.quantity]));
-
-    const lowStock = medicines.filter((m) => (invMap[m._id.toString()] ?? 0) <= m.reorderLevel);
+    const lowStock = medicines.filter((m) => (m.stock ?? 0) <= m.reorderLevel);
     sendSuccess(res, 200, 'Low stock medicines', lowStock);
   } catch (err) {
     sendError(res, 500, err.message);
